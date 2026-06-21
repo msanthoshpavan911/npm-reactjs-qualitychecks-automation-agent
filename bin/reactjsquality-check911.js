@@ -40,7 +40,7 @@ program
 
 program
     .command("hooks")
-    .description("Install pre-commit (ESLint + coverage) and pre-push (Playwright + audit) git hooks")
+    .description("Install pre-commit git hook (ESLint + coverage + Playwright + audit)")
     .action(() => require("../commands/hooks")());
 
 program.parse(process.argv);

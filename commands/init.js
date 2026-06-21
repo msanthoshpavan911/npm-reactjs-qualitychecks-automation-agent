@@ -17,9 +17,9 @@ const FRAMEWORKS = [
 const CHECKS = [
     { id: "eslint",           label: "ESLint          — code style and error rules on staged chunks" },
     { id: "codesmells",       label: "Code Smells      — SonarJS: cognitive complexity, duplicate code, dead code" },
-    { id: "vulnerabilities",  label: "Vulnerabilities  — eslint-security: eval/injection/unsafe regex + npm audit CVE scan on push" },
+    { id: "vulnerabilities",  label: "Vulnerabilities  — eslint-security: eval/injection/unsafe regex + npm audit CVE scan on commit" },
     { id: "coverage",         label: "Coverage         — Jest line coverage (95% threshold per changed file)" },
-    { id: "playwright",       label: "Playwright       — E2E smoke tests run before every git push" }
+    { id: "playwright",       label: "Playwright       — E2E smoke tests run before every git commit" }
 ];
 
 const COPILOT_INSTRUCTIONS = {
@@ -56,7 +56,7 @@ Use the \`fix\` MCP tool when the user asks to fix quality issues.
 - ESLint: react/recommended + typescript-eslint/recommended
 - No unused variables, no console.log in production code, no implicit \`any\`
 - Jest: 80% minimum line coverage on changed files
-- Playwright: all smoke tests must pass before every push
+- Playwright: all smoke tests must pass before every commit
 `,
     nextjs: `# Next.js Quality Agent
 
@@ -224,6 +224,6 @@ ${Object.entries(checks).map(([k, v]) => `  ${v ? "✅" : "❌"}  ${k}`).join("\
 
 Next steps:
   reactjsquality-check911 scan     — index your components for Copilot
-  reactjsquality-check911 hooks    — install pre-commit and pre-push git hooks
+  reactjsquality-check911 hooks    — install pre-commit git hook
 `);
 };
