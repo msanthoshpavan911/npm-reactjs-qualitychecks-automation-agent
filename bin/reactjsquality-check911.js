@@ -34,8 +34,13 @@ program
     .action(() => require("../commands/scan")());
 
 program
+    .command("audit")
+    .description("Run npm audit for high/critical CVEs (only if vulnerabilities check is enabled)")
+    .action(() => require("../commands/audit")());
+
+program
     .command("hooks")
-    .description("Install pre-commit (ESLint + coverage) and pre-push (Playwright) git hooks")
+    .description("Install pre-commit (ESLint + coverage) and pre-push (Playwright + audit) git hooks")
     .action(() => require("../commands/hooks")());
 
 program.parse(process.argv);

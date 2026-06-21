@@ -27,7 +27,7 @@ reactjsquality-check911 coverage
 
 const PRE_PUSH = `#!/bin/sh
 # reactjsquality-check911 — pre-push hook
-# Runs Playwright smoke tests before every push
+# Runs Playwright smoke tests and npm audit before every push
 
 set -e
 
@@ -43,6 +43,7 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 reactjsquality-check911 playwright
+reactjsquality-check911 audit
 `;
 
 module.exports = function hooks() {
@@ -66,9 +67,12 @@ module.exports = function hooks() {
     console.log(`
 Hooks installed. From now on:
 
-  git commit  →  ESLint errors on changed chunks block the commit
-                 Jest coverage < 80% on changed files blocks the commit
+  git commit  →  ESLint errors block the commit (changed chunks only)
+                 Code Smells (SonarJS) block the commit  [if enabled]
+                 Security violations block the commit    [if enabled]
+                 Jest coverage < 80% blocks the commit   [if enabled]
 
-  git push    →  Playwright smoke tests must all pass before push is allowed
+  git push    →  Playwright smoke tests must pass        [if enabled]
+                 npm audit for high/critical CVEs         [if enabled]
 `);
 };

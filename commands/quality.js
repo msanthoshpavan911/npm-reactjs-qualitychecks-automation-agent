@@ -1,8 +1,9 @@
 "use strict";
 
 const { execSync } = require("child_process");
-const fs   = require("fs");
-const path = require("path");
+const fs      = require("fs");
+const path    = require("path");
+const PKG_ROOT = path.join(__dirname, "..");
 
 const CONFIG_FILE = ".reactjs-quality-agent.json";
 
@@ -96,6 +97,58 @@ function runEslint(staged, changedRanges) {
     }
 }
 
+function runWithPlugin(staged, changedRanges, configFile, label) {
+    process.stdout.write(`Running ${label}...`.padEnd(30));
+    const eslintJs   = path.join(PKG_ROOT, "node_modules", "eslint", "bin", "eslint.js");
+    const configPath = path.join(PKG_ROOT, "config", configFile);
+
+    if (!fs.existsSync(eslintJs)) {
+        console.log("⚠️  (ESLint not in package — reinstall reactjsquality-check911)");
+        return { passed: true, summary: `⚠️  ${label}: ESLint not found` };
+    }
+
+    try {
+        const fileArgs = staged.map(f => `"${f}"`).join(" ");
+        let output = "";
+        try {
+            output = execSync(
+                `node "${eslintJs}" ${fileArgs} --format json --no-eslintrc --resolve-plugins-relative-to "${PKG_ROOT}" --config "${configPath}"`,
+                { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
+            );
+        } catch (e) {
+            output = e.stdout || "[]";
+        }
+
+        const data   = JSON.parse(output || "[]");
+        const viols  = [];
+        const errors = [];
+
+        for (const file of data) {
+            const ranges = findRanges(file.filePath, changedRanges);
+            if (!ranges) continue;
+            for (const msg of file.messages) {
+                if (!inChangedRange(msg.line, ranges)) continue;
+                const lbl   = msg.severity === 2 ? "error" : "warn";
+                const entry = `  [${label}:${msg.ruleId || "?"}] ${path.basename(file.filePath)}:${msg.line} — ${msg.message} (${lbl})`;
+                viols.push(entry);
+                if (msg.severity === 2) errors.push(entry);
+            }
+        }
+
+        if (errors.length) {
+            console.log("❌");
+            viols.forEach(v => console.log(v));
+            return { passed: false, summary: `❌ ${label}: ${errors.length} issue(s) in changed lines` };
+        }
+        console.log("✅");
+        if (viols.length) viols.forEach(v => console.log(v));
+        return { passed: true, summary: `✅ ${label} passed` };
+    } catch (e) {
+        console.log("⚠️");
+        return { passed: true, summary: `⚠️  ${label}: ${e.message.slice(0, 80)}` };
+    }
+}
+
 function runTypeScript(staged) {
     const tsFiles = staged.filter(f => f.endsWith(".ts") || f.endsWith(".tsx"));
     process.stdout.write("Running TypeScript... ");
@@ -137,6 +190,18 @@ module.exports = function quality() {
 
     if (config.checks.eslint !== false) {
         const r = runEslint(staged, changedRanges);
+        results.push(r.summary);
+        if (!r.passed) failed = true;
+    }
+
+    if (config.checks.codesmells) {
+        const r = runWithPlugin(staged, changedRanges, "sonarjs.eslintrc.json", "Code Smells");
+        results.push(r.summary);
+        if (!r.passed) failed = true;
+    }
+
+    if (config.checks.vulnerabilities) {
+        const r = runWithPlugin(staged, changedRanges, "security.eslintrc.json", "Security");
         results.push(r.summary);
         if (!r.passed) failed = true;
     }

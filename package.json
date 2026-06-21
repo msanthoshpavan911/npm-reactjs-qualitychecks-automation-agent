@@ -39,6 +39,9 @@
   ],
   "type": "commonjs",
   "dependencies": {
-    "commander": "^15.0.0"
+    "commander":              "^15.0.0",
+    "eslint":                 "^8.57.0",
+    "eslint-plugin-sonarjs":  "^0.25.0",
+    "eslint-plugin-security": "^3.0.0"
   }
 }
