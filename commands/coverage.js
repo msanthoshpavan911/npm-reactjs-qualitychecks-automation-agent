@@ -4,7 +4,7 @@ const { execSync } = require("child_process");
 const fs   = require("fs");
 const path = require("path");
 
-const THRESHOLD   = 80;
+const THRESHOLD   = 95;
 const CONFIG_FILE = ".reactjs-quality-agent.json";
 
 function loadConfig() {

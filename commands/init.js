@@ -18,7 +18,7 @@ const CHECKS = [
     { id: "eslint",           label: "ESLint          — code style and error rules on staged chunks" },
     { id: "codesmells",       label: "Code Smells      — SonarJS: cognitive complexity, duplicate code, dead code" },
     { id: "vulnerabilities",  label: "Vulnerabilities  — eslint-security: eval/injection/unsafe regex + npm audit CVE scan on push" },
-    { id: "coverage",         label: "Coverage         — Jest line coverage (80% threshold per changed file)" },
+    { id: "coverage",         label: "Coverage         — Jest line coverage (95% threshold per changed file)" },
     { id: "playwright",       label: "Playwright       — E2E smoke tests run before every git push" }
 ];
 
