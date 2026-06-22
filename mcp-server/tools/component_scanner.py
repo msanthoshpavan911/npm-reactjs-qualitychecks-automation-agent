@@ -2,7 +2,7 @@ import os
 import re
 from pathlib import Path
 
-SRC_EXTS  = (".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte")
+SRC_EXTS  = (".js", ".jsx", ".ts", ".tsx")
 SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".next", "coverage", ".cache"}
 
 

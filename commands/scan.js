@@ -5,7 +5,7 @@ const path = require("path");
 
 function readFile(f) { try { return fs.readFileSync(f, "utf8"); } catch (_) { return ""; } }
 
-const SRC_EXTS = /\.(js|jsx|ts|tsx|vue|svelte)$/;
+const SRC_EXTS = /\.(js|jsx|ts|tsx)$/;
 
 // ── file walkers ──────────────────────────────────────────────────────────────
 

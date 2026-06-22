@@ -16,7 +16,7 @@ function getStagedSourceFiles() {
         const out = execSync("git diff --cached --name-only", { encoding: "utf8" });
         return out.split("\n").map(f => f.trim()).filter(f =>
             f &&
-            /\.(js|jsx|ts|tsx|vue)$/.test(f) &&
+            /\.(js|jsx|ts|tsx)$/.test(f) &&
             !f.includes(".test.") && !f.includes(".spec.") &&
             !f.includes("__tests__") &&
             fs.existsSync(f)
@@ -25,8 +25,8 @@ function getStagedSourceFiles() {
 }
 
 function findTestFile(srcFile) {
-    const base = srcFile.replace(/\.(js|jsx|ts|tsx|vue)$/, "");
-    const ext  = srcFile.match(/\.(js|jsx|ts|tsx|vue)$/)[1];
+    const base = srcFile.replace(/\.(js|jsx|ts|tsx)$/, "");
+    const ext  = srcFile.match(/\.(js|jsx|ts|tsx)$/)[1];
     const testExt = ext === "js" ? "js" : ext === "jsx" ? "tsx" : "tsx";
     return [
         `${base}.test.${testExt}`,

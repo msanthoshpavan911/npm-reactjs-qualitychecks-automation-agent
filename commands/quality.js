@@ -15,7 +15,7 @@ function getStagedFiles() {
     try {
         const out = execSync("git diff --cached --name-only", { encoding: "utf8" });
         return out.split("\n").map(f => f.trim())
-            .filter(f => f && /\.(js|jsx|ts|tsx|vue|svelte)$/.test(f) && fs.existsSync(f));
+            .filter(f => f && /\.(js|jsx|ts|tsx)$/.test(f) && fs.existsSync(f));
     } catch (_) { return []; }
 }
 

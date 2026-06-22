@@ -3,7 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 
-SRC_EXTS = (".js", ".jsx", ".ts", ".tsx", ".vue")
+SRC_EXTS = (".js", ".jsx", ".ts", ".tsx")
 
 
 def get_staged_files():
@@ -46,23 +46,25 @@ def test_generator() -> str:
         ext     = "tsx" if f.endswith(".tsx") else "ts" if f.endswith(".ts") else "jsx" if f.endswith(".jsx") else "js"
         test_file = f.rsplit(".", 1)[0] + f".test.{ext}"
 
-        prompt = f"""Generate Jest tests for `{fname}`.
+        prompt = f"""Generate Jest + React Testing Library tests for `{fname}`.
 
 File: {f}
 Exports: {', '.join(exports) if exports else fname.rsplit('.', 1)[0]}
 Props: {', '.join(props) if props else 'none detected'}
 
 ## Source
-```ts
+```tsx
 {src[:3000]}
 ```
 
 ## Instructions
 - Test file: `{test_file}`
-- Cover: all exports — renders correctly, prop variations, user interactions, error and loading states
+- Import from: `@testing-library/react` and `@testing-library/user-event`
+- Cover: renders correctly, all prop variations, user interactions (click, type, submit), error states, loading states
 - Method naming: `should {{expected}} when {{condition}}`
-- Mock fetch/axios/API calls with `jest.fn()`
-- Use `screen.getByRole`, `getByText`, `getByTestId` — avoid class/id selectors
+- Mock fetch/axios with `jest.fn()` or MSW (Mock Service Worker)
+- Use `screen.getByRole`, `getByText`, `getByTestId` — never query by class or id
+- Wrap state-changing interactions in `act()` or use `userEvent` which handles it
 - Run with: `npx jest {test_file} --coverage`
 """
         output_parts.append(prompt)

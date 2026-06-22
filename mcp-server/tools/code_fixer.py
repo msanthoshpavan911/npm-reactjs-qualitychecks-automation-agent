@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 
-SRC_EXTS = (".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte")
+SRC_EXTS = (".js", ".jsx", ".ts", ".tsx")
 
 
 def get_staged_files():

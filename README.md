@@ -1,6 +1,6 @@
 # reactjsquality-check911
 
-A GitHub Copilot agent for frontend JS/TS projects that enforces ESLint, Jest coverage, Playwright E2E tests, and npm security audit on every `git commit` — with AI-assisted test generation via Claude and GitHub Copilot.
+A GitHub Copilot agent for React/TypeScript projects that enforces ESLint, Jest + React Testing Library coverage, Playwright E2E tests, and npm security audit on every `git commit` — with AI-assisted test generation via Claude and GitHub Copilot.
 
 ---
 
