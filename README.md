@@ -1,6 +1,6 @@
 # reactjsquality-check911
 
-A GitHub Copilot agent for React/JS projects that enforces ESLint, Jest coverage, Playwright E2E tests, and npm security audit on every `git commit` — with AI-assisted test generation via Claude and GitHub Copilot.
+A GitHub Copilot agent for frontend JS/TS projects that enforces ESLint, Jest coverage, Playwright E2E tests, and npm security audit on every `git commit` — with AI-assisted test generation via Claude and GitHub Copilot.
 
 ---
 
@@ -65,18 +65,8 @@ Navigate to your frontend project root and run:
 reactjsquality-check911 init
 ```
 
-You will be asked two questions interactively:
+You will be asked to select which quality checks to enable:
 
-**1. Select your framework:**
-```
-1. React
-2. Next.js
-3. Vue / Nuxt
-4. Angular
-5. Vanilla JS / TypeScript
-```
-
-**2. Select quality checks to enable:**
 ```
 1. ESLint          — code style and error rules on staged chunks
 2. Code Smells     — SonarJS: cognitive complexity, duplicate code, dead code
@@ -92,7 +82,7 @@ You will be asked two questions interactively:
 | File | Purpose |
 |---|---|
 | `.reactjs-quality-agent.json` | Your project's quality configuration |
-| `.github/copilot-instructions.md` | Framework-specific AI instructions for Copilot |
+| `.github/copilot-instructions.md` | AI instructions for Copilot (test generation + fix guidelines) |
 | `.vscode/mcp.json` | Connects MCP server to VS Code Copilot Chat |
 | `docs/architecture.md` | Stub — populated by the `scan` command |
 | `docs/component-index.md` | Stub — populated by the `scan` command |
@@ -281,7 +271,6 @@ All checks read from `.reactjs-quality-agent.json` at the project root:
 
 ```json
 {
-  "framework": "react",
   "checks": {
     "eslint": true,
     "codesmells": true,
@@ -375,33 +364,6 @@ npm list -g reactjsquality-check911
 # Re-install if needed
 npm install -g reactjsquality-check911
 ```
-
----
-
-## Framework-specific Notes
-
-### React / Next.js
-- Tests use Jest + React Testing Library
-- Use `screen.getByRole`, `getByText`, `getByTestId` — avoid querying by class or id
-- Mock API calls with `jest.fn()` or MSW (Mock Service Worker)
-- Playwright tests should use Page Object Model pattern under `tests/`
-
-### Next.js (additional)
-- API route tests use `NextRequest` / `NextResponse` mocks
-- Use `<Image>` instead of `<img>`, `<Link>` instead of `<a>` for internal links
-
-### Vue / Nuxt
-- Tests use Jest + Vue Test Utils
-- Mock Pinia stores with `createTestingPinia()`
-- Composition API only — no Options API
-
-### Angular
-- Tests use Jest + `TestBed.configureTestingModule()`
-- HTTP services use `HttpClientTestingModule` + `HttpTestingController`
-
-### Vanilla JS / TypeScript
-- Tests cover every exported function and class
-- Mock dependencies with `jest.fn()` and `jest.spyOn()`
 
 ---
 
