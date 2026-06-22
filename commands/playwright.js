@@ -182,15 +182,74 @@ module.exports = function playwright() {
     // Auto-create playwright config if missing
     const configFiles = ["playwright.config.ts", "playwright.config.js", "playwright.config.mjs"];
     if (!configFiles.some(f => fs.existsSync(f))) {
-        const isTs       = fs.existsSync("tsconfig.json");
+        const isTs = fs.existsSync("tsconfig.json");
+
+        // Detect CRA vs Vite React
+        let devCommand = "npm start";
+        let port       = 3000;
+        try {
+            const pkg  = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+            if (deps["vite"] || deps["@vitejs/plugin-react"]) {
+                devCommand = "npm run dev";
+                port = 5173;
+            }
+        } catch (_) {}
+
+        const baseURL    = `http://localhost:${port}`;
         const configFile = isTs ? "playwright.config.ts" : "playwright.config.js";
-        const configBody = isTs
-            ? `import { defineConfig } from '@playwright/test';\n\nexport default defineConfig({\n  testDir: './tests',\n  use: { baseURL: 'http://localhost:3000' },\n});\n`
-            : `const { defineConfig } = require('@playwright/test');\n\nmodule.exports = defineConfig({\n  testDir: './tests',\n  use: { baseURL: 'http://localhost:3000' },\n});\n`;
-        fs.writeFileSync(configFile, configBody);
+
+        const tsConfig = `import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  reporter: 'list',
+  use: {
+    baseURL: '${baseURL}',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: {
+    command: '${devCommand}',
+    url: '${baseURL}',
+    reuseExistingServer: true,
+    timeout: 120000,
+  },
+});
+`;
+        const jsConfig = `const { defineConfig, devices } = require('@playwright/test');
+
+module.exports = defineConfig({
+  testDir: './tests',
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  reporter: 'list',
+  use: {
+    baseURL: '${baseURL}',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: {
+    command: '${devCommand}',
+    url: '${baseURL}',
+    reuseExistingServer: true,
+    timeout: 120000,
+  },
+});
+`;
+        fs.writeFileSync(configFile, isTs ? tsConfig : jsConfig);
         fs.mkdirSync("tests", { recursive: true });
-        console.log(`  Step 3/3 — Created ${configFile} and tests/ directory.`);
-        console.log(`  ✅ Update baseURL in ${configFile} to match your dev server URL.\n`);
+        console.log(`  Step 3/3 — Created ${configFile}`);
+        console.log(`  ✅ Dev server: "${devCommand}" → ${baseURL}`);
+        console.log(`     If your app runs on a different port, update baseURL in ${configFile}.\n`);
     }
 
     fs.mkdirSync("tests", { recursive: true });
