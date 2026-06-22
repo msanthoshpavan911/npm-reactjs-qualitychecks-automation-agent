@@ -88,19 +88,61 @@ module.exports = function playwright() {
         return;
     }
 
-    // Verify playwright is installed
-    if (!fs.existsSync("node_modules/.bin/playwright") && !fs.existsSync("node_modules/@playwright/test")) {
-        console.log("⚠️  Playwright not installed — skipping.");
-        console.log("   Run: npm install -D @playwright/test && npx playwright install");
-        return;
+    // Auto-install Playwright if opted in but not yet installed
+    const playwrightInstalled =
+        fs.existsSync("node_modules/.bin/playwright") ||
+        fs.existsSync("node_modules/@playwright/test");
+
+    if (!playwrightInstalled) {
+        console.log("📦 Playwright is enabled but not installed — setting up automatically...\n");
+
+        try {
+            console.log("  Step 1/3 — Installing @playwright/test...");
+            execSync("npm install -D @playwright/test", { stdio: "inherit" });
+            console.log("  ✅ @playwright/test installed.\n");
+        } catch (_) {
+            console.log(`
+❌ Failed to install @playwright/test automatically.
+
+Run manually:
+  npm install -D @playwright/test
+
+Then re-commit.
+`);
+            process.exit(1);
+        }
+
+        try {
+            console.log("  Step 2/3 — Installing Playwright browsers (chromium only)...");
+            execSync("npx playwright install chromium", { stdio: "inherit" });
+            console.log("  ✅ Chromium browser installed.\n");
+        } catch (_) {
+            console.log(`
+❌ Failed to install Playwright browsers automatically.
+
+Run manually:
+  npx playwright install
+
+Then re-commit.
+`);
+            process.exit(1);
+        }
     }
 
-    // Verify playwright config exists
+    // Auto-create playwright config if missing
     const configFiles = ["playwright.config.ts", "playwright.config.js", "playwright.config.mjs"];
     if (!configFiles.some(f => fs.existsSync(f))) {
-        console.log("⚠️  No playwright.config.ts found — skipping.");
-        console.log("   Run: npx playwright init");
-        return;
+        const isTs       = fs.existsSync("tsconfig.json");
+        const configFile = isTs ? "playwright.config.ts" : "playwright.config.js";
+        const configBody = isTs
+            ? `import { defineConfig } from '@playwright/test';\n\nexport default defineConfig({\n  testDir: './tests',\n  use: { baseURL: 'http://localhost:3000' },\n});\n`
+            : `const { defineConfig } = require('@playwright/test');\n\nmodule.exports = defineConfig({\n  testDir: './tests',\n  use: { baseURL: 'http://localhost:3000' },\n});\n`;
+
+        fs.writeFileSync(configFile, configBody);
+        fs.mkdirSync("tests", { recursive: true });
+
+        console.log(`  Step 3/3 — Created ${configFile} and tests/ directory.`);
+        console.log(`  ✅ Update baseURL in ${configFile} to match your dev server URL.\n`);
     }
 
     // If no test files exist, attempt AI generation
