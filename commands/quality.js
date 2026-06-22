@@ -108,11 +108,13 @@ function runWithPlugin(staged, changedRanges, configFile, label) {
     }
 
     try {
-        const fileArgs = staged.map(f => `"${f}"`).join(" ");
+        const fileArgs  = staged.map(f => `"${f}"`).join(" ");
+        const parserPath = path.join(PKG_ROOT, "node_modules", "@typescript-eslint", "parser");
+        const parserArg  = fs.existsSync(parserPath) ? `--parser "${parserPath}"` : "";
         let output = "";
         try {
             output = execSync(
-                `node "${eslintJs}" ${fileArgs} --format json --no-eslintrc --resolve-plugins-relative-to "${PKG_ROOT}" --config "${configPath}"`,
+                `node "${eslintJs}" ${fileArgs} --format json --no-eslintrc --resolve-plugins-relative-to "${PKG_ROOT}" ${parserArg} --config "${configPath}"`,
                 { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
             );
         } catch (e) {
