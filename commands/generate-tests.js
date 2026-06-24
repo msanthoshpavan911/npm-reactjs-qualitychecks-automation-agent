@@ -368,6 +368,14 @@ module.exports = async function generateTests(filePath) {
     if (!filePath) { console.error("No file path provided."); process.exit(1); }
 
     filePath = filePath.replace(/^['"]|['"]$/g, "").trim();
+
+    if (filePath.endsWith(".java")) {
+        console.error("\n❌ Java files are not supported by reactjsquality-check911.");
+        console.error("   For Spring Boot projects, use:");
+        console.error("     springbootquality-check911 generate-tests " + filePath + "\n");
+        process.exit(1);
+    }
+
     if (!fs.existsSync(filePath)) { console.error(`File not found: ${filePath}`); process.exit(1); }
 
     const src     = fs.readFileSync(filePath, "utf8");
