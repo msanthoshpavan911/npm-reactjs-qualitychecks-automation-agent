@@ -34,6 +34,11 @@ program
     .action(() => require("../commands/scan")());
 
 program
+    .command("generate-tests [file]")
+    .description("Generate Jest unit tests for a source file and verify 95% coverage")
+    .action((file) => require("../commands/generate-tests")(file));
+
+program
     .command("audit")
     .description("Run npm audit for high/critical CVEs (only if vulnerabilities check is enabled)")
     .action(() => require("../commands/audit")());
