@@ -7,7 +7,7 @@ const readline = require("readline");
 
 const THRESHOLD = 95;
 
-// ── helpers ────────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function ask(question) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -16,11 +16,10 @@ function ask(question) {
 
 function detectFramework(src) {
     if (/from ['"]react['"]/.test(src) || /require\(['"]react['"]\)/.test(src)) {
-        const isHook = /export\s+(default\s+)?(?:function\s+|const\s+)use[A-Z]/.test(src);
-        return isHook ? "hook" : "react";
+        return /export\s+(default\s+)?(?:function\s+|const\s+)use[A-Z]/.test(src) ? "hook" : "react";
     }
     if (/from ['"]vue['"]/.test(src)) return "vue";
-    if (/@angular\/core/.test(src)) return "angular";
+    if (/@angular\/core/.test(src))  return "angular";
     return "module";
 }
 
@@ -42,244 +41,316 @@ function extractProps(src) {
 
 function extractNamedExports(src) {
     const fns = [];
-    for (const m of src.matchAll(/export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g)) {
+    for (const m of src.matchAll(/export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g))
         fns.push({ name: m[1], params: m[2].split(",").map(p => p.trim()).filter(Boolean) });
-    }
-    for (const m of src.matchAll(/export\s+const\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*(?::[^=]+)?=>/g)) {
+    for (const m of src.matchAll(/export\s+const\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*(?::[^=]+)?=>/g))
         fns.push({ name: m[1], params: m[2].split(",").map(p => p.trim()).filter(Boolean) });
-    }
     return fns;
 }
 
 function paramValue(param, i) {
-    const name = param.split(":")[0].trim().replace(/[?!]/g, "").toLowerCase();
-    if (/id$/.test(name))                       return `"test-id-${i}"`;
-    if (/num|count|index|size|length/.test(name)) return String(i + 1);
-    if (/flag|bool|enabled|visible|active/.test(name)) return "true";
-    if (/arr|list|items|data/.test(name))       return "[]";
-    if (/obj|options|config/.test(name))        return "{}";
-    if (/fn|callback|handler|on[A-Z]/.test(name)) return "jest.fn()";
-    return `"test-${name}"`;
+    const n = param.split(":")[0].trim().replace(/[?!]/g, "").toLowerCase();
+    if (/id$/.test(n))                              return `"test-id-${i}"`;
+    if (/num|count|index|size|length/.test(n))      return String(i + 1);
+    if (/flag|bool|enabled|visible|active/.test(n)) return "true";
+    if (/arr|list|items|data/.test(n))              return "[]";
+    if (/obj|options|config/.test(n))               return "{}";
+    if (/fn|callback|handler|on[A-Z]/.test(n))      return "jest.fn()";
+    return `"test-${n}"`;
 }
 
 function testFilePath(filePath) {
-    const ext  = path.extname(filePath);
-    const base = filePath.slice(0, -ext.length);
-    return `${base}.test${ext}`;
+    const ext = path.extname(filePath);
+    return filePath.slice(0, -ext.length) + ".test" + ext;
 }
 
-// ── generators ────────────────────────────────────────────────────────────────
+// ── test-case builders — each returns [{ name, body }] ───────────────────────
 
-function generateReactTests(src, filePath) {
-    const name        = extractComponentName(src, filePath);
-    const props       = extractProps(src);
-    const hasDefault  = /export\s+default/.test(src);
-    const importStr   = hasDefault
-        ? `import ${name} from './${path.basename(filePath, path.extname(filePath))}';`
-        : `import { ${name} } from './${path.basename(filePath, path.extname(filePath))}';`;
-
+function reactTestCases(src, filePath) {
+    const name      = extractComponentName(src, filePath);
+    const props     = extractProps(src);
     const propAttrs = props.slice(0, 4).map(p => ` ${p}="test-value"`).join("");
+    const tag       = `<${name}${propAttrs} />`;
 
-    const propTests = props.slice(0, 4).map(p => `
-    it('renders with ${p} prop set', () => {
-        const { container } = render(<${name} ${p}="test-prop-value" />);
-        expect(container).toBeTruthy();
-    });`).join("");
-
-    return `import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-${importStr}
-
-describe('${name}', () => {
-
-    it('renders without crashing', () => {
-        const { container } = render(<${name}${propAttrs} />);
+    const cases = [
+        {
+            name: "renders without crashing",
+            body: `    it('renders without crashing', () => {
+        const { container } = render(${tag});
         expect(container).toBeTruthy();
         expect(container.firstChild).not.toBeNull();
-    });
-
-    it('renders without throwing when props are omitted', () => {
+    });`
+        },
+        {
+            name: "renders without throwing when props are omitted",
+            body: `    it('renders without throwing when props are omitted', () => {
         expect(() => render(<${name} />)).not.toThrow();
-    });
-
-    it('is accessible — renders into the document', () => {
-        const { baseElement } = render(<${name}${propAttrs} />);
+    });`
+        },
+        {
+            name: "is accessible — renders into the document",
+            body: `    it('is accessible — renders into the document', () => {
+        const { baseElement } = render(${tag});
         expect(baseElement).toBeInTheDocument();
-    });
-${propTests}
-    it('matches snapshot', () => {
-        const { asFragment } = render(<${name}${propAttrs} />);
+    });`
+        },
+        {
+            name: "matches snapshot",
+            body: `    it('matches snapshot', () => {
+        const { asFragment } = render(${tag});
         expect(asFragment()).toMatchSnapshot();
-    });
-
-    it('unmounts cleanly without errors', () => {
-        const { unmount } = render(<${name}${propAttrs} />);
+    });`
+        },
+        {
+            name: "unmounts cleanly without errors",
+            body: `    it('unmounts cleanly without errors', () => {
+        const { unmount } = render(${tag});
         expect(() => unmount()).not.toThrow();
-    });
+    });`
+        },
+        {
+            name: "re-renders without crashing",
+            body: `    it('re-renders without crashing', () => {
+        const { rerender } = render(${tag});
+        expect(() => rerender(${tag})).not.toThrow();
+    });`
+        }
+    ];
 
-    it('re-renders without crashing', () => {
-        const { rerender } = render(<${name}${propAttrs} />);
-        expect(() => rerender(<${name}${propAttrs} />)).not.toThrow();
-    });
-});
-`;
+    for (const prop of props.slice(0, 4)) {
+        cases.push({
+            name: `renders with ${prop} prop set`,
+            body: `    it('renders with ${prop} prop set', () => {
+        const { container } = render(<${name} ${prop}="test-prop-value" />);
+        expect(container).toBeTruthy();
+    });`
+        });
+    }
+
+    return cases;
 }
 
-function generateHookTests(src, filePath) {
+function hookTestCases(src, filePath) {
     const hookName = path.basename(filePath, path.extname(filePath));
     const fns      = extractNamedExports(src);
     const hook     = fns.find(f => f.name.startsWith("use")) || { name: hookName, params: [] };
     const argStr   = hook.params.map((p, i) => paramValue(p, i)).join(", ");
 
-    return `import { renderHook, act } from '@testing-library/react';
-import { ${hook.name} } from './${hookName}';
-
-describe('${hook.name}', () => {
-
-    it('initializes without throwing', () => {
+    return [
+        {
+            name: "initializes without throwing",
+            body: `    it('initializes without throwing', () => {
         expect(() => renderHook(() => ${hook.name}(${argStr}))).not.toThrow();
-    });
-
-    it('returns a defined value on mount', () => {
+    });`
+        },
+        {
+            name: "returns a defined value on mount",
+            body: `    it('returns a defined value on mount', () => {
         const { result } = renderHook(() => ${hook.name}(${argStr}));
         expect(result.current).toBeDefined();
-    });
-
-    it('returns a stable value across re-renders', () => {
+    });`
+        },
+        {
+            name: "returns a stable value across re-renders",
+            body: `    it('returns a stable value across re-renders', () => {
         const { result, rerender } = renderHook(() => ${hook.name}(${argStr}));
         rerender();
         expect(result.current).toBeDefined();
-    });
-
-    it('handles async state changes without error', async () => {
+    });`
+        },
+        {
+            name: "handles async state changes without error",
+            body: `    it('handles async state changes without error', async () => {
         const { result } = renderHook(() => ${hook.name}(${argStr}));
-        await act(async () => {
-            // trigger any async effects here
-        });
+        await act(async () => {});
         expect(result.current).toBeDefined();
-    });
-
-    it('unmounts without memory leaks', () => {
+    });`
+        },
+        {
+            name: "unmounts without memory leaks",
+            body: `    it('unmounts without memory leaks', () => {
         const { unmount } = renderHook(() => ${hook.name}(${argStr}));
         expect(() => unmount()).not.toThrow();
-    });
-});
-`;
+    });`
+        }
+    ];
 }
 
-function generateModuleTests(src, filePath) {
-    const fns     = extractNamedExports(src);
-    const modName = path.basename(filePath, path.extname(filePath));
-    const rel     = `./${modName}`;
-
-    const hasDefault = /export\s+default/.test(src);
-    const defMatch   = src.match(/export\s+default\s+(?:function\s+)?(\w+)/);
-    const defName    = defMatch ? defMatch[1] : null;
-
-    let importLine;
-    if (defName && fns.length) {
-        importLine = `import ${defName}, { ${fns.map(f => f.name).join(", ")} } from '${rel}';`;
-    } else if (defName) {
-        importLine = `import ${defName} from '${rel}';`;
-    } else if (fns.length) {
-        importLine = `import { ${fns.map(f => f.name).join(", ")} } from '${rel}';`;
-    } else {
-        importLine = `import * as ${modName}Module from '${rel}';`;
-    }
-
-    const blocks = fns.map(fn => {
-        const args    = fn.params.map((p, i) => paramValue(p, i)).join(", ");
+function moduleTestCases(src) {
+    const fns   = extractNamedExports(src);
+    const cases = [];
+    for (const fn of fns) {
+        const args     = fn.params.map((p, i) => paramValue(p, i)).join(", ");
         const nullArgs = fn.params.map(() => "undefined").join(", ");
-        return `
-describe('${fn.name}', () => {
-
-    it('is exported and callable', () => {
+        cases.push(
+            {
+                name: `${fn.name} — is exported and callable`,
+                body: `    it('${fn.name} — is exported and callable', () => {
         expect(typeof ${fn.name}).toBe('function');
-    });
-
-    it('does not throw with valid inputs', () => {
+    });`
+            },
+            {
+                name: `${fn.name} — does not throw with valid inputs`,
+                body: `    it('${fn.name} — does not throw with valid inputs', () => {
         expect(() => ${fn.name}(${args})).not.toThrow();
-    });
-
-    it('returns a defined value for valid inputs', () => {
+    });`
+            },
+            {
+                name: `${fn.name} — returns a defined value`,
+                body: `    it('${fn.name} — returns a defined value', () => {
         const result = ${fn.name}(${args});
         expect(result).toBeDefined();
-    });
-
-    it('handles empty / undefined inputs gracefully', () => {
+    });`
+            },
+            {
+                name: `${fn.name} — handles undefined inputs gracefully`,
+                body: `    it('${fn.name} — handles undefined inputs gracefully', () => {
         expect(() => ${fn.name}(${nullArgs})).not.toThrow();
-    });
-
-    it('handles empty string inputs', () => {
-        const emptyArgs = ${JSON.stringify(fn.params.map(() => ""))};
-        expect(() => ${fn.name}(...emptyArgs)).not.toThrow();
-    });
-});`;
-    });
-
-    const fallback = `
-describe('${modName} module', () => {
-    it('loads without errors', () => {
-        expect(true).toBe(true);
-    });
-});`;
-
-    return `${importLine}
-${blocks.length ? blocks.join("\n") : fallback}
-`;
+    });`
+            }
+        );
+    }
+    return cases;
 }
 
-function generateVueTests(src, filePath) {
-    const name   = extractComponentName(src, filePath);
-    const modName = path.basename(filePath, path.extname(filePath));
+function vueTestCases(src, filePath) {
+    const name = extractComponentName(src, filePath);
+    return [
+        {
+            name: "mounts without crashing",
+            body: `    it('mounts without crashing', () => {
+        const wrapper = shallowMount(${name});
+        expect(wrapper.exists()).toBe(true);
+    });`
+        },
+        {
+            name: "renders correctly",
+            body: `    it('renders correctly', () => {
+        const wrapper = mount(${name});
+        expect(wrapper.html()).toBeTruthy();
+    });`
+        },
+        {
+            name: "matches snapshot",
+            body: `    it('matches snapshot', () => {
+        const wrapper = shallowMount(${name});
+        expect(wrapper.html()).toMatchSnapshot();
+    });`
+        },
+        {
+            name: "unmounts without errors",
+            body: `    it('unmounts without errors', () => {
+        const wrapper = mount(${name});
+        expect(() => wrapper.unmount()).not.toThrow();
+    });`
+        }
+    ];
+}
 
-    return `import { mount, shallowMount } from '@vue/test-utils';
-import ${name} from './${modName}.vue';
+// ── full-file builder (new files only) ───────────────────────────────────────
+
+function buildFullFile(src, filePath, fw, cases) {
+    const modName = path.basename(filePath, path.extname(filePath));
+    const rel     = `./${modName}`;
+    const body    = cases.map(c => c.body).join("\n\n");
+
+    if (fw === "react") {
+        const name       = extractComponentName(src, filePath);
+        const hasDefault = /export\s+default/.test(src);
+        const imp        = hasDefault ? `import ${name} from '${rel}';` : `import { ${name} } from '${rel}';`;
+        return `import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+${imp}
 
 describe('${name}', () => {
 
-    it('mounts without crashing', () => {
-        const wrapper = shallowMount(${name});
-        expect(wrapper.exists()).toBe(true);
-    });
+${body}
+});
+`;
+    }
 
-    it('renders correctly', () => {
-        const wrapper = mount(${name});
-        expect(wrapper.html()).toBeTruthy();
-    });
+    if (fw === "hook") {
+        const fns  = extractNamedExports(src);
+        const hook = fns.find(f => f.name.startsWith("use")) || { name: modName };
+        return `import { renderHook, act } from '@testing-library/react';
+import { ${hook.name} } from '${rel}';
 
-    it('matches snapshot', () => {
-        const wrapper = shallowMount(${name});
-        expect(wrapper.html()).toMatchSnapshot();
-    });
+describe('${hook.name}', () => {
 
-    it('unmounts without errors', () => {
-        const wrapper = mount(${name});
-        expect(() => wrapper.unmount()).not.toThrow();
-    });
+${body}
+});
+`;
+    }
+
+    if (fw === "vue") {
+        const name = extractComponentName(src, filePath);
+        return `import { mount, shallowMount } from '@vue/test-utils';
+import ${name} from '${rel}.vue';
+
+describe('${name}', () => {
+
+${body}
+});
+`;
+    }
+
+    // module
+    const fns        = extractNamedExports(src);
+    const defMatch   = src.match(/export\s+default\s+(?:function\s+)?(\w+)/);
+    const defName    = defMatch ? defMatch[1] : null;
+    let importLine;
+    if (defName && fns.length) importLine = `import ${defName}, { ${fns.map(f => f.name).join(", ")} } from '${rel}';`;
+    else if (defName)          importLine = `import ${defName} from '${rel}';`;
+    else if (fns.length)       importLine = `import { ${fns.map(f => f.name).join(", ")} } from '${rel}';`;
+    else                       importLine = `import * as ${modName}Module from '${rel}';`;
+
+    return `${importLine}
+
+describe('${modName}', () => {
+
+${body}
 });
 `;
 }
 
-// ── coverage check ─────────────────────────────────────────────────────────────
+// ── existing-file modifier ────────────────────────────────────────────────────
+
+function getExistingTestNames(content) {
+    const names = new Set();
+    for (const m of content.matchAll(/\bit\s*\(\s*['"`]([^'"`]+)['"`]/g))
+        names.add(m[1]);
+    return names;
+}
+
+function injectCases(existingContent, newCases) {
+    const injection = "\n" + newCases.map(c => c.body).join("\n\n") + "\n";
+    // insert before the last `});` — the closing of the outermost describe block
+    const lastClose = existingContent.lastIndexOf("});");
+    if (lastClose === -1)
+        return existingContent.trimEnd() + "\n" + injection + "\n";
+    return existingContent.slice(0, lastClose) + injection + "});\n";
+}
+
+// ── coverage ──────────────────────────────────────────────────────────────────
 
 function runCoverage(srcPath, testPath) {
     try {
         try {
-            execSync(`npx jest "${testPath}" --coverage --coverageReporters=json-summary --passWithNoTests --silent`, {
-                encoding: "utf8", stdio: ["pipe", "pipe", "pipe"]
-            });
-        } catch (_) { /* jest exits 1 on test failure — we still read the report */ }
+            execSync(
+                `npx jest "${testPath}" --coverage --coverageReporters=json-summary --passWithNoTests --silent`,
+                { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
+            );
+        } catch (_) { /* jest exits 1 on failures but still writes the report */ }
 
         const summaryPath = "coverage/coverage-summary.json";
         if (!fs.existsSync(summaryPath)) return null;
 
         const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
-        const absPath = path.resolve(srcPath).replace(/\\/g, "/");
+        const abs     = path.resolve(srcPath).replace(/\\/g, "/");
         const entry   = Object.entries(summary).find(([k]) => {
             const kn = k.replace(/\\/g, "/");
-            return kn === absPath || kn.endsWith("/" + srcPath.replace(/\\/g, "/"));
+            return kn === abs || kn.endsWith("/" + srcPath.replace(/\\/g, "/"));
         });
         if (!entry) return null;
 
@@ -288,7 +359,7 @@ function runCoverage(srcPath, testPath) {
     } catch (_) { return null; }
 }
 
-// ── main ───────────────────────────────────────────────────────────────────────
+// ── main ──────────────────────────────────────────────────────────────────────
 
 module.exports = async function generateTests(filePath) {
     if (!filePath) {
@@ -296,33 +367,50 @@ module.exports = async function generateTests(filePath) {
     }
     if (!filePath) { console.error("No file path provided."); process.exit(1); }
 
-    filePath = filePath.replace(/^['"]|['"]$/g, "").trim(); // strip quotes if user added them
+    filePath = filePath.replace(/^['"]|['"]$/g, "").trim();
     if (!fs.existsSync(filePath)) { console.error(`File not found: ${filePath}`); process.exit(1); }
 
-    const src      = fs.readFileSync(filePath, "utf8");
-    const fw       = detectFramework(src);
-    const outPath  = testFilePath(filePath);
+    const src     = fs.readFileSync(filePath, "utf8");
+    const fw      = detectFramework(src);
+    const outPath = testFilePath(filePath);
+    const exists  = fs.existsSync(outPath);
 
-    console.log(`\nAnalyzed:  ${filePath}  (${fw})`);
-    console.log(`Output:    ${outPath}\n`);
+    console.log(`\nSource:  ${filePath}  (${fw})`);
+    console.log(`Tests:   ${outPath}  (${exists ? "exists — will add missing cases" : "will be created"})\n`);
 
-    let content;
-    if (fw === "hook")   content = generateHookTests(src, filePath);
-    else if (fw === "react")  content = generateReactTests(src, filePath);
-    else if (fw === "vue")    content = generateVueTests(src, filePath);
-    else                      content = generateModuleTests(src, filePath);
+    let allCases;
+    if (fw === "hook")       allCases = hookTestCases(src, filePath);
+    else if (fw === "react") allCases = reactTestCases(src, filePath);
+    else if (fw === "vue")   allCases = vueTestCases(src, filePath);
+    else                     allCases = moduleTestCases(src);
 
-    fs.writeFileSync(outPath, content);
-    console.log(`✅ Test file written: ${outPath}`);
+    if (!exists) {
+        // ── CREATE ────────────────────────────────────────────────────────────
+        fs.writeFileSync(outPath, buildFullFile(src, filePath, fw, allCases));
+        console.log(`✅ Created: ${outPath}  (${allCases.length} test cases)`);
+    } else {
+        // ── MODIFY ───────────────────────────────────────────────────────────
+        const existingContent = fs.readFileSync(outPath, "utf8");
+        const existingNames   = getExistingTestNames(existingContent);
+        const newCases        = allCases.filter(c => !existingNames.has(c.name));
 
+        if (!newCases.length) {
+            console.log("✅ All generated test cases already exist — nothing new to add.");
+        } else {
+            fs.writeFileSync(outPath, injectCases(existingContent, newCases));
+            console.log(`✅ Modified: ${outPath}  (+${newCases.length} new case(s) added)`);
+            newCases.forEach(c => console.log(`   + ${c.name}`));
+        }
+    }
+
+    // ── coverage ──────────────────────────────────────────────────────────────
     process.stdout.write("\nRunning Jest coverage...  ");
     const cov = runCoverage(filePath, outPath);
 
     if (!cov) {
         console.log("⚠️\n");
         console.log("Could not measure coverage (Jest not installed or test errored).");
-        console.log(`Review the generated file and run:`);
-        console.log(`  npx jest "${outPath}" --coverage\n`);
+        console.log(`Run manually:  npx jest "${outPath}" --coverage\n`);
         return;
     }
 
@@ -331,11 +419,11 @@ module.exports = async function generateTests(filePath) {
 
     if (cov.lines < THRESHOLD) {
         console.log(`\nCoverage is ${cov.lines}% — below the ${THRESHOLD}% target.`);
-        console.log("To close the gap, open the test file and ask Copilot:");
+        console.log("Ask Copilot in the test file:");
         console.log(`  'Add more Jest tests for ${path.basename(filePath)} to reach 95% line coverage'`);
         console.log(`  'Write tests for the uncovered branches in ${path.basename(filePath)}'`);
-        console.log(`\nThen re-run: npx jest "${outPath}" --coverage\n`);
+        console.log(`\nThen re-run:  npx jest "${outPath}" --coverage\n`);
     } else {
-        console.log(`\n✅ Coverage target met. Test file is ready at: ${outPath}\n`);
+        console.log(`\n✅ Coverage target met. Tests are at: ${outPath}\n`);
     }
 };
