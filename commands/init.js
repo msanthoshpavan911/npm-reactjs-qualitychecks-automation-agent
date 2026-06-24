@@ -92,18 +92,30 @@ module.exports = async function init() {
     // ── .vscode/mcp.json ─────────────────────────────────────────────────────
     fs.mkdirSync(".vscode", { recursive: true });
     const mcpServerPath = path.join(PKG_ROOT, "mcp-server", "server.py");
-    const mcpConfig = {
-        servers: {
-            "reactjs-quality-agent": {
-                type: "stdio",
-                command: "python",
-                args: [mcpServerPath],
-                env: {}
-            }
+    const mcpServers = {
+        "reactjs-quality-agent": {
+            type: "stdio",
+            command: "python",
+            args: [mcpServerPath],
+            env: {}
         }
     };
-    fs.writeFileSync(".vscode/mcp.json", JSON.stringify(mcpConfig, null, 2));
+
+    // Add Playwright MCP server if playwright check is enabled
+    if (checks.playwright) {
+        mcpServers["playwright"] = {
+            type: "stdio",
+            command: "npx",
+            args: ["@playwright/mcp@latest"],
+            env: {}
+        };
+    }
+
+    fs.writeFileSync(".vscode/mcp.json", JSON.stringify({ servers: mcpServers }, null, 2));
     console.log("✅ .vscode/mcp.json configured");
+    if (checks.playwright) {
+        console.log("✅ Playwright MCP server added — Copilot can now browse your app and generate tests");
+    }
 
     // ── docs stubs ────────────────────────────────────────────────────────────
     fs.mkdirSync("docs", { recursive: true });

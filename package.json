@@ -1,6 +1,6 @@
 {
   "name": "reactjsquality-check911",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "GitHub Copilot agent for React/TypeScript projects — enforces ESLint, Jest + React Testing Library coverage, Playwright, and npm audit on every commit",
   "bin": {
     "reactjsquality-check911": "./bin/reactjsquality-check911.js"

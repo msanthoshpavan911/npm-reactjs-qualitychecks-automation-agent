@@ -26,24 +26,40 @@ function getStagedSourceFiles() {
 }
 
 function findTestFile(srcFile) {
-    const base    = srcFile.replace(/\.(js|jsx|ts|tsx)$/, "");
-    const ext     = srcFile.match(/\.(js|jsx|ts|tsx)$/)[1];
-    const testExt = ext === "js" ? "js" : "tsx";
-    return [
-        `${base}.test.${testExt}`,
-        `${base}.test.${ext}`,
-        `${base}.spec.${testExt}`,
-        `${base}.spec.${ext}`,
-        base.replace(/\/src\//, "/src/__tests__/") + `.test.${testExt}`,
-        base.replace(/\/src\//, "/src/__tests__/") + `.test.${ext}`,
-    ].find(f => fs.existsSync(f));
+    const base      = srcFile.replace(/\.(js|jsx|ts|tsx)$/, "");
+    const name      = path.basename(base);
+    const dir       = path.dirname(base);
+    const allExts   = ["js", "jsx", "ts", "tsx"];
+    const suffixes  = ["test", "spec"];
+
+    const candidates = [];
+
+    // Same directory — every extension combination
+    for (const suffix of suffixes)
+        for (const ext of allExts)
+            candidates.push(`${base}.${suffix}.${ext}`);
+
+    // __tests__ sibling folder
+    const testsDir = path.join(dir, "__tests__");
+    for (const suffix of suffixes)
+        for (const ext of allExts)
+            candidates.push(path.join(testsDir, `${name}.${suffix}.${ext}`));
+
+    // src/__tests__ (common CRA pattern)
+    const srcTestsBase = base.replace(/[/\\]src[/\\]/, `${path.sep}src${path.sep}__tests__${path.sep}`);
+    if (srcTestsBase !== base) {
+        for (const suffix of suffixes)
+            for (const ext of allExts)
+                candidates.push(`${srcTestsBase}.${suffix}.${ext}`);
+    }
+
+    return candidates.find(f => fs.existsSync(f)) || null;
 }
 
 function expectedTestPath(srcFile) {
-    const base    = srcFile.replace(/\.(js|jsx|ts|tsx)$/, "");
-    const ext     = srcFile.match(/\.(js|jsx|ts|tsx)$/)[1];
-    const testExt = ext === "js" ? "js" : "tsx";
-    return `${base}.test.${testExt}`;
+    const base = srcFile.replace(/\.(js|jsx|ts|tsx)$/, "");
+    const ext  = srcFile.match(/\.(js|jsx|ts|tsx)$/)[1];
+    return `${base}.test.${ext}`;
 }
 
 function cliAvailable(cmd) {
