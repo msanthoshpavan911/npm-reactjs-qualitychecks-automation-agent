@@ -5,7 +5,7 @@ const { program } = require("commander");
 
 program
     .name("reactjsquality-check911")
-    .description("React/JS quality agent — ESLint, Jest coverage, Playwright on every commit")
+    .description("React/JS quality agent — ESLint, Jest coverage, Playwright on every commit.\nRun 'init' to configure the Jest Coverage Expert Copilot agent for automated test generation to 95% coverage.")
     .version(require("../package.json").version);
 
 program
@@ -32,11 +32,6 @@ program
     .command("scan")
     .description("Scan components, pages, and services — rebuild architecture.md")
     .action(() => require("../commands/scan")());
-
-program
-    .command("generate-tests [file]")
-    .description("Generate Jest unit tests for a source file and verify 95% coverage")
-    .action((file) => require("../commands/generate-tests")(file));
 
 program
     .command("audit")

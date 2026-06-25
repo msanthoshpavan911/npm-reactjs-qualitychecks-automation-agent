@@ -1,12 +1,18 @@
 # reactjsquality-check911
 
-A GitHub Copilot agent for React/TypeScript projects that enforces ESLint, Jest + React Testing Library coverage, Playwright E2E tests, and npm security audit on every `git commit` — with AI-assisted test generation via Claude and GitHub Copilot.
+A developer CLI that enforces code quality and test coverage on your React/TypeScript projects — automatically, on every commit.
+
+- Runs **ESLint**, **SonarJS code smells**, and **security checks** on staged files before every commit
+- Enforces **95% Jest line coverage** on changed files before every commit
+- Configures **GitHub Copilot** with a full Jest test generation workflow — just ask in Agent mode
+- Configures an **MCP server** so Copilot can navigate and fix your project directly
+- Works as a **git pre-commit hook** — no CI changes required
 
 ---
 
 ## What it does
 
-Every `git commit` automatically runs all enabled quality checks in sequence:
+Every `git commit` automatically runs all enabled checks in sequence:
 
 ```
 git commit -m "your message"
@@ -17,12 +23,12 @@ git commit -m "your message"
   └──────┬──────┘
          │ pass
          ▼
-  ┌─────────────┐   fail → shows coverage % per file → add tests
+  ┌─────────────┐   fail → shows coverage % per file → use Copilot Agent mode
   │  coverage   │
   └──────┬──────┘
          │ pass
          ▼
-  ┌─────────────┐   fail → runs AI generation (Claude/Copilot) or shows guide
+  ┌─────────────┐   fail → runs Playwright tests → fix failing specs
   │ playwright  │
   └──────┬──────┘
          │ pass
@@ -42,6 +48,7 @@ git commit -m "your message"
 - Node.js >= 18.0.0
 - Git
 - Python (for MCP server)
+- VS Code + GitHub Copilot (for AI-assisted test generation)
 
 ---
 
@@ -51,21 +58,17 @@ git commit -m "your message"
 npm install -g reactjsquality-check911
 ```
 
-During installation, the Python MCP server dependency (`fastmcp`) is installed automatically via `pip`.
-
 ---
 
 ## Setup (First Time)
 
 ### Step 1 — Initialize your project
 
-Navigate to your frontend project root and run:
-
 ```bash
 reactjsquality-check911 init
 ```
 
-You will be asked to select which quality checks to enable:
+Select which quality checks to enable:
 
 ```
 1. ESLint          — code style and error rules on staged chunks
@@ -82,7 +85,7 @@ You will be asked to select which quality checks to enable:
 | File | Purpose |
 |---|---|
 | `.reactjs-quality-agent.json` | Your project's quality configuration |
-| `.github/copilot-instructions.md` | AI instructions for Copilot (test generation + fix guidelines) |
+| `.github/copilot-instructions.md` | Full Jest test generation workflow + React guidelines for Copilot |
 | `.vscode/mcp.json` | Connects MCP server to VS Code Copilot Chat |
 | `docs/architecture.md` | Stub — populated by the `scan` command |
 | `docs/component-index.md` | Stub — populated by the `scan` command |
@@ -93,26 +96,109 @@ You will be asked to select which quality checks to enable:
 reactjsquality-check911 hooks
 ```
 
-This creates `.githooks/pre-commit` and configures git to use it:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-From this point, every `git commit` automatically runs all 4 quality checks.
-
 ### Step 3 — (Optional) Scan your codebase
 
 ```bash
 reactjsquality-check911 scan
 ```
 
-Walks your `src/`, `app/`, `pages/`, `components/`, `hooks/`, `services/`, and `stores/` directories and generates:
+---
 
-- `docs/architecture.md` — detailed breakdown with routes, props, API calls per component, and an ASCII layer diagram
-- `docs/component-index.md` — flat component index used by Copilot Chat for context
+## Generating Jest Tests with 95% Coverage
 
-Run this whenever you add new components to keep Copilot's context up to date.
+After running `init`, `.github/copilot-instructions.md` contains a full step-by-step Jest test generation workflow. VS Code Copilot reads this file automatically in Agent mode.
+
+### How to use
+
+**Step 1** — Open Copilot Chat in VS Code (`Ctrl+Alt+I`)
+
+**Step 2** — Click the mode dropdown at the bottom-left of the chat input and select **Agent**
+
+**Step 3** — Type:
+```
+Generate Jest tests for Button with 95% coverage
+```
+
+No file attachment needed. Copilot finds the file itself.
+
+### What Copilot does automatically
+
+1. **Finds** the source file using terminal (`dir /s /b "Button.tsx"`)
+2. **Reads** the file and detects its type (React component / hook / utility module)
+3. **Generates** a complete Jest test file using the correct pattern:
+   - React components → `@testing-library/react` with render, interaction, snapshot, and accessibility tests
+   - Hooks → `renderHook` + `act` from `@testing-library/react`
+   - Utility modules → plain Jest function tests
+4. **Writes** the test file alongside the source (`Button.tsx` → `Button.test.tsx`)
+5. **Runs** `npx jest "<testFile>" --coverage --coverageReporters=json-summary`
+6. **Reads** `coverage/coverage-summary.json` and checks `lines.pct`
+7. **Iterates** up to 5 times — adds tests for uncovered branches, rewrites the file, re-runs Jest
+8. **Stops** when line coverage ≥ 95% and reports the result
+
+### What the generated tests look like
+
+```tsx
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import Button from './Button';
+
+describe('Button', () => {
+
+    it('renders without crashing', () => {
+        const { container } = render(<Button label="Click me" />);
+        expect(container.firstChild).not.toBeNull();
+    });
+
+    it('matches snapshot', () => {
+        const { asFragment } = render(<Button label="Click me" />);
+        expect(asFragment()).toMatchSnapshot();
+    });
+
+    it('calls onClick when clicked', async () => {
+        const handleClick = jest.fn();
+        render(<Button label="Click me" onClick={handleClick} />);
+        await userEvent.click(screen.getByRole('button'));
+        expect(handleClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('is disabled when disabled prop is true', () => {
+        render(<Button label="Click me" disabled />);
+        expect(screen.getByRole('button')).toBeDisabled();
+    });
+
+});
+```
+
+### Final report
+
+```
+✅ Button.tsx — 97.5% line coverage (2 iterations)
+Test file: src/components/Button.test.tsx
+Test cases created: 7
+```
+
+---
+
+## Using GitHub Copilot to Fix Violations
+
+After `init`, VS Code Copilot Chat gets access to MCP tools via `.vscode/mcp.json`. Open Copilot Chat (`Ctrl+Alt+I`), switch to **Agent** mode, and use these prompts:
+
+| What you type | What it does |
+|---|---|
+| `Generate Jest tests for ComponentName with 95% coverage` | Finds file, generates tests, runs Jest, iterates until 95% |
+| `Fix the quality violations in my staged files` | Runs ESLint/SonarJS on staged files — returns violations + fixes |
+| `Index my components` | Rebuilds `docs/component-index.md` for Copilot context |
+
+### What Copilot knows about your project
+
+Because `init` wrote `.github/copilot-instructions.md`, Copilot always behaves as a **Senior React Engineer** that:
+
+- Generates Jest tests using `@testing-library/react` (never Enzyme)
+- Targets 95% minimum line coverage
+- Uses `userEvent` for interactions
+- Queries by role/text/testId — never CSS class or id
+- Fixes ESLint and TypeScript violations
 
 ---
 
@@ -125,7 +211,7 @@ reactjsquality-check911 init
 reactjsquality-check911 hooks
 reactjsquality-check911 scan
 
-# Run checks manually (same as what the hook runs)
+# Run checks manually
 reactjsquality-check911 quality
 reactjsquality-check911 coverage
 reactjsquality-check911 playwright
@@ -140,43 +226,22 @@ git commit --no-verify -m "your message"
 ## Commands
 
 ### `init`
-
-First-time project setup. Interactively selects the framework and quality checks, then writes all configuration files.
-
-```bash
-reactjsquality-check911 init
-```
+First-time project setup. Selects quality checks and creates all config files including the Copilot instructions with the full Jest test generation workflow.
 
 ### `quality`
+Runs ESLint, SonarJS, eslint-security, and TypeScript type checking on **only the lines you changed** in staged files.
 
-Runs ESLint, SonarJS code smell detection, eslint-security, and TypeScript type checking on **only the lines you changed** in staged files — not the entire file.
-
-```bash
-reactjsquality-check911 quality
-```
-
-**What it checks:**
-- ESLint rule violations (errors block commit; warnings display but allow commit)
-- Code smells via SonarJS: cognitive complexity > 15, duplicate strings, identical functions, empty/unused collections, redundant boolean logic
-- Security issues via eslint-security: `eval()`, unsafe regex, non-literal `require()`, object injection, timing attacks, CSRF
-- TypeScript type errors on `.ts`/`.tsx` files
-
-**If it fails:** Ask Copilot Chat — *"Fix the quality violations in my staged files"*. The MCP `fix` tool automatically provides the exact violations and changed code chunks to Copilot.
+**If it fails:** Ask Copilot (Agent mode) — `Fix the quality violations in my staged files`
 
 ### `coverage`
+Runs Jest on the test file for each staged source file and verifies line coverage meets the 95% threshold.
 
-Runs Jest on the test file corresponding to each staged source file and verifies line coverage meets the 95% threshold.
-
-```bash
-reactjsquality-check911 coverage
-```
-
-**How test files are resolved (in order):**
+Test file resolution order:
 1. `Button.test.tsx` alongside `Button.tsx`
 2. `Button.spec.tsx`
 3. `__tests__/Button.test.tsx`
 
-**If it fails:** Ask Copilot Chat — *"Generate Jest tests to reach 95% coverage for my changed files"*. The MCP `generate_tests` tool provides the file content, detected props, and framework-specific instructions to Copilot.
+**If it fails:** Ask Copilot (Agent mode) — `Generate Jest tests for Button with 95% coverage`
 
 **Prerequisites:**
 ```bash
@@ -184,90 +249,35 @@ npm install -D jest @testing-library/react @testing-library/user-event
 ```
 
 ### `playwright`
-
-Runs `npx playwright test` against your E2E test files. If no test files are found, it attempts to auto-generate them using AI before running.
-
-```bash
-reactjsquality-check911 playwright
-```
-
-**AI generation order (when no tests exist):**
-1. Tries **Claude CLI** (`claude`) if available
-2. Falls back to **GitHub Copilot CLI** (`gh copilot suggest`)
-3. If neither is available, prints step-by-step instructions to generate via Copilot Chat or claude.ai
-
-**If tests fail:** Run `npx playwright test` locally to debug, or ask Copilot Chat — *"Fix the failing Playwright tests"*.
+Runs `npx playwright test` against your E2E test files.
 
 **Prerequisites:**
 ```bash
 npm install -D @playwright/test
 npx playwright install
-npx playwright init    # creates playwright.config.ts
+npx playwright init
 ```
 
 ### `audit`
-
-Runs `npm audit` and blocks the commit if any **high** or **critical** severity CVEs are found. Low and medium severity issues are reported but do not block.
-
-```bash
-reactjsquality-check911 audit
-```
+Runs `npm audit` and blocks the commit if any **high** or **critical** severity CVEs are found.
 
 **If it fails:**
 ```bash
-npm audit fix           # auto-fix compatible updates
-npm audit fix --force   # force upgrades (review carefully — may introduce breaking changes)
-npm audit               # view full vulnerability details
+npm audit fix
+npm audit fix --force
 ```
 
 ### `scan`
-
-Analyzes the entire codebase and generates documentation under `docs/`.
-
-```bash
-reactjsquality-check911 scan
-```
-
-**What it produces:**
-
-`docs/architecture.md`:
-- Summary table of components, pages, hooks, services, stores
-- Per-page: route path and API calls
-- Per-component: props, custom hooks used, API calls
-- Per-service: exported functions and endpoints
-- ASCII diagram of application layers
-
-`docs/component-index.md`:
-- Flat categorized list of every source file (good for search and Copilot context)
+Analyzes the codebase and generates `docs/architecture.md` and `docs/component-index.md` for Copilot context.
 
 ### `hooks`
-
-Installs the pre-commit git hook that runs all quality checks on every `git commit`.
-
-```bash
-reactjsquality-check911 hooks
-```
-
-**What gets installed:**
-
-`.githooks/pre-commit` runs in sequence:
-1. `reactjsquality-check911 quality`
-2. `reactjsquality-check911 coverage`
-3. `reactjsquality-check911 playwright`
-4. `reactjsquality-check911 audit`
-
-Git is configured to use `.githooks/` via:
-```bash
-git config core.hooksPath .githooks
-```
-
-> Commit `.githooks/pre-commit` to your repository so all teammates get the same hooks.
+Installs the pre-commit git hook. Runs: `quality` → `coverage` → `playwright` → `audit`.
 
 ---
 
 ## Configuration
 
-All checks read from `.reactjs-quality-agent.json` at the project root:
+All checks read from `.reactjs-quality-agent.json`:
 
 ```json
 {
@@ -281,41 +291,17 @@ All checks read from `.reactjs-quality-agent.json` at the project root:
 }
 ```
 
-Set any check to `false` to disable it — it will silently skip during the pre-commit hook without blocking your commit.
+Set any check to `false` to disable it.
 
 ### Thresholds
 
-| Check | Threshold | Configurable |
-|---|---|---|
-| ESLint | Any error blocks | Via your project's `.eslintrc` |
-| Code Smells (cognitive complexity) | 15 | Edit `config/sonarjs.eslintrc.json` |
-| Code Smells (duplicate strings) | 3 occurrences | Edit `config/sonarjs.eslintrc.json` |
-| Jest coverage | 95% per changed file | No |
-| npm audit | High + Critical only | No |
-| Playwright | All tests must pass | No |
-| TypeScript | Any error blocks | Via your `tsconfig.json` |
-
----
-
-## MCP Server (Copilot Chat Integration)
-
-After running `init`, VS Code Copilot Chat gets access to these tools automatically via `.vscode/mcp.json`:
-
-| Tool | Ask Copilot |
+| Check | Threshold |
 |---|---|
-| `fix` | *"Fix the quality violations in my staged files"* |
-| `generate_tests` | *"Generate Jest tests for my staged files"* |
-| `scan` | *"Index my components"* |
-| `playwright_setup` | *"Generate Playwright tests for my pages"* |
-| `read_file` | *"Read src/components/Button.tsx"* |
-| `ping` | *"Is the MCP server working?"* |
-
-The MCP server runs as a local stdio process (`mcp-server/server.py`). It reads your staged files, extracts violations and context, and feeds structured prompts to Copilot so it can generate accurate fixes and tests without you having to copy-paste code manually.
-
-**If the MCP server is not connecting:**
-1. Verify `.vscode/mcp.json` exists (run `init` again if missing)
-2. Test manually: `python mcp-server/server.py`
-3. Check that `pip install fastmcp` succeeded during install
+| ESLint | Any error blocks |
+| Code Smells (cognitive complexity) | 15 |
+| Jest coverage | 95% per changed file |
+| npm audit | High + Critical only |
+| Playwright | All tests must pass |
 
 ---
 
@@ -323,15 +309,9 @@ The MCP server runs as a local stdio process (`mcp-server/server.py`). It reads 
 
 ### Pre-commit hook not running
 ```bash
-# Verify the hook file exists and is executable
 ls -la .githooks/pre-commit
-
-# Verify git is using the hooks directory
-git config core.hooksPath
-# Should output: .githooks
-
-# Test the hook manually
-.githooks/pre-commit
+git config core.hooksPath        # should output: .githooks
+reactjsquality-check911 hooks    # re-install if missing
 ```
 
 ### `.reactjs-quality-agent.json` not found
@@ -344,6 +324,12 @@ reactjsquality-check911 init
 npm install eslint eslint-plugin-sonarjs eslint-plugin-security
 ```
 
+### Coverage below 95%
+Ask Copilot in Agent mode:
+```
+Generate Jest tests for ComponentName with 95% coverage
+```
+
 ### Playwright skipped with warning
 ```bash
 npm install -D @playwright/test
@@ -351,18 +337,14 @@ npx playwright install
 npx playwright init
 ```
 
-### Coverage below 95%
-- Check that the test file is being detected (watch for `⚠️ no test file found` warnings)
-- Verify `coverage/coverage-summary.json` is being generated by Jest
-- Add more test cases covering the changed lines
+---
 
-### `reactjsquality-check911` not found after install
+## Upgrading
+
 ```bash
-# Check it's on your PATH
-npm list -g reactjsquality-check911
-
-# Re-install if needed
-npm install -g reactjsquality-check911
+npm install -g reactjsquality-check911@latest
+reactjsquality-check911 init
+reactjsquality-check911 hooks
 ```
 
 ---
