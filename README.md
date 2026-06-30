@@ -8,6 +8,8 @@ A developer CLI that enforces code quality and test coverage on your React/TypeS
 - Configures an **MCP server** so Copilot can navigate and fix your project directly
 - Works as a **git pre-commit hook** — no CI changes required
 
+## Description
+	A GitHub Copilot agent for React/TypeScript projects that enforces code quality on every git commit — runs ESLint, Jest + React Testing Library coverage (95%), Playwright E2E tests, and npm security audit automatically via git hooks. Integrates with GitHub Copilot and Claude to auto-generate missing tests when none exist, and uses Playwright MCP to browse the actual running app and write accurate E2E specs.
 ---
 
 ## What it does
